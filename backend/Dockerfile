@@ -1,20 +1,19 @@
-# Use specific Python version
-FROM python:3.12.14-slim
+# Use the latest available Python 3.12 slim image
+FROM python:3.12-slim
 
 # Set working directory inside container
 WORKDIR /app
 
-# Copy backend code into container
-COPY . /app
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Upgrade pip, setuptools, wheel
-RUN pip install --upgrade pip setuptools wheel
+# Copy the rest of the app
+COPY . .
 
-# Install dependencies
-RUN pip install -r requirements.txt
-
-# Expose the port your app will run on
+# Expose the port
 EXPOSE 8000
 
-# Command to run the FastAPI app
+# Command to run the app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
