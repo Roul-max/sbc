@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 from pathlib import Path
 from typing import List, Dict
 import tempfile
@@ -10,7 +11,7 @@ from pydub import AudioSegment
 
 app = FastAPI(title="Speech Segmentation API")
 
-# Allow both local development and deployed frontend
+# Allow local dev and deployed frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -48,7 +49,7 @@ async def process_audio(file: UploadFile = File(...)):
 
         segments = detect_speech_segments(str(temp_file_path))
 
-        # Return file_id, segments, and URL for frontend to load waveform
+        # Return file_id, segments, and URL for frontend waveform
         audio_url = f"/api/audio/{file_id}"
         return JSONResponse(content={
             "file_id": file_id,
@@ -64,7 +65,7 @@ async def process_audio(file: UploadFile = File(...)):
 @app.get("/api/audio/{file_id}")
 async def get_audio(file_id: str):
     """
-    Serve the uploaded audio file for waveform preview
+    Serve uploaded audio file for waveform preview
     """
     audio_files = list(UPLOAD_DIR.glob(f"{file_id}.*"))
     if not audio_files:
@@ -74,8 +75,8 @@ async def get_audio(file_id: str):
 
 def detect_speech_segments(audio_path: str) -> List[Dict]:
     """
-    Detect speech segments in audio file using voice activity detection
-    This is a mock implementation; replace with real detection in production.
+    Mock speech segments detection
+    Replace with real VAD in production
     """
     return [
         {"id": "1", "startTime": 0.5, "endTime": 5.2, "duration": 4.7, "name": "Speech Segment 1"},
@@ -85,29 +86,32 @@ def detect_speech_segments(audio_path: str) -> List[Dict]:
     ]
 
 
-@app.post("/api/extract-segment")
-async def extract_segment(
-    file_id: str,
-    start_time: float,
-    end_time: float,
+# Pydantic model for segment extraction request
+class SegmentRequest(BaseModel):
+    file_id: str
+    start_time: float
+    end_time: float
     segment_name: str = "segment"
-):
+
+
+@app.post("/api/extract-segment")
+async def extract_segment(req: SegmentRequest):
     """
-    Extract a specific segment from the audio file using pydub
+    Extract a specific audio segment using JSON body
     """
-    audio_files = list(UPLOAD_DIR.glob(f"{file_id}.*"))
+    audio_files = list(UPLOAD_DIR.glob(f"{req.file_id}.*"))
     if not audio_files:
         raise HTTPException(status_code=404, detail="Audio file not found")
 
     audio_path = audio_files[0]
-    output_path = UPLOAD_DIR / f"{file_id}_{segment_name}.mp3"
+    output_path = UPLOAD_DIR / f"{req.file_id}_{req.segment_name}.mp3"
 
     try:
-        extract_audio_segment(str(audio_path), str(output_path), start_time, end_time)
+        extract_audio_segment(str(audio_path), str(output_path), req.start_time, req.end_time)
         return FileResponse(
             output_path,
             media_type="audio/mpeg",
-            filename=f"{segment_name}.mp3"
+            filename=f"{req.segment_name}.mp3"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -127,7 +131,7 @@ def extract_audio_segment(input_path: str, output_path: str, start: float, end: 
 @app.delete("/api/cleanup/{file_id}")
 async def cleanup_files(file_id: str):
     """
-    Clean up temporary files
+    Delete temporary files for a given file_id
     """
     try:
         files = list(UPLOAD_DIR.glob(f"{file_id}*"))
