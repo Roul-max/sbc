@@ -13,7 +13,7 @@ app = FastAPI(title="Speech Segmentation API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://speech-orcin-ten.vercel.app/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
